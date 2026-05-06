@@ -1,0 +1,39 @@
+# =============================================
+# RAG Project Dependencies
+# =============================================
+
+# --- LangChain (orchestration framework) ---
+langchain>=0.3.25
+langchain-community>=0.3.24
+langchain-core>=0.3.58
+
+# --- Embeddings ---
+sentence-transformers==3.4.1
+
+# --- Vector Store ---
+faiss-cpu==1.11.0
+
+# --- LLM Providers ---
+# Ollama integration (primary LLM)
+langchain-ollama==0.3.2
+# HuggingFace integration (secondary, for learning)
+langchain-huggingface==0.1.2
+transformers==4.48.3
+accelerate==1.3.0
+
+# --- Document Loaders ---
+pypdf==5.4.0
+
+# --- API Backend ---
+fastapi==0.115.12
+uvicorn==0.34.0
+python-multipart==0.0.20
+
+# --- Frontend ---
+streamlit==1.43.2
+httpx==0.28.1
+
+# --- Utilities ---
+python-dotenv==1.1.0
+pydantic==2.11.1
+pydantic-settings==2.8.1
