@@ -9,6 +9,15 @@ rag-project/
 venv/
 .env
 
+# Runtime data
+.tmp/
+backend/data/chroma_db/*
+backend/data/faiss_index/*
+backend/data/uploads/*
+!backend/data/chroma_db/.gitkeep
+!backend/data/faiss_index/.gitkeep
+!backend/data/uploads/.gitkeep
+
 # VS Code
 .vscode/
 
