@@ -1,0 +1,6 @@
+[server]
+# Disable the file watcher to avoid a noisy (but harmless) traceback caused by
+# Streamlit's watcher peeking into torch._classes on PyTorch >= 2.x.
+# Side-effect: edits to source files won't auto-reload — just press "R" in the
+# browser, or restart `streamlit run app.py`.
+fileWatcherType = "none"

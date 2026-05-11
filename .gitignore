@@ -5,18 +5,12 @@ __pycache__/
 *.pyd
 
 # Virtual Environment
-rag-project/
-venv/
+.venv/
 .env
 
 # Runtime data
 .tmp/
-backend/data/chroma_db/*
-backend/data/faiss_index/*
-backend/data/uploads/*
-!backend/data/chroma_db/.gitkeep
-!backend/data/faiss_index/.gitkeep
-!backend/data/uploads/.gitkeep
+chroma_db/
 
 # VS Code
 .vscode/
@@ -30,3 +24,5 @@ backend/data/uploads/*
 # OS files
 .DS_Store
 Thumbs.db
+
+.claude/

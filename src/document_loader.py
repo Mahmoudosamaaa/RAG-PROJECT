@@ -1,12 +1,11 @@
 """
-Document ingestion utilities for the RAG pipeline.
+Document loading and chunking for the RAG pipeline.
 
-In RAG, ingestion is the first step:
-1. Load a document from disk.
-2. Turn it into text with useful metadata.
-3. Split the text into smaller chunks for embedding and retrieval.
+Loads PDF / TXT / MD files, attaches per-page metadata for PDFs, and splits
+the resulting documents into overlapping chunks ready for embedding.
 """
 
+import logging
 from pathlib import Path
 from typing import Iterable
 
@@ -14,21 +13,17 @@ from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from pypdf import PdfReader
 
-from backend.app.config import settings
 
+logger = logging.getLogger(__name__)
 
 SUPPORTED_EXTENSIONS = {".pdf", ".txt", ".md"}
 
-
-def ensure_data_directories() -> None:
-    """Create runtime folders used by uploads and vector indexes."""
-    settings.upload_path.mkdir(parents=True, exist_ok=True)
-    settings.faiss_index_path.mkdir(parents=True, exist_ok=True)
+DEFAULT_CHUNK_SIZE = 800
+DEFAULT_CHUNK_OVERLAP = 150
 
 
 def load_document(file_path: str | Path) -> list[Document]:
-    """
-    Load one supported file into LangChain Document objects.
+    """Load one supported file into LangChain Document objects.
 
     PDFs become one Document per page. Text and Markdown files become one
     Document for the full file.
@@ -42,26 +37,29 @@ def load_document(file_path: str | Path) -> list[Document]:
         supported = ", ".join(sorted(SUPPORTED_EXTENSIONS))
         raise ValueError(f"Unsupported file type '{suffix}'. Supported: {supported}")
 
+    logger.info("Loading %s (type=%s)", path.name, suffix)
     if suffix == ".pdf":
-        return _load_pdf(path)
+        docs = _load_pdf(path)
+        total_chars = sum(len(d.page_content) for d in docs)
+        logger.info(
+            "Loaded %s — %d page(s), %d chars total", path.name, len(docs), total_chars
+        )
+        return docs
 
-    return [_load_text(path)]
+    doc = _load_text(path)
+    logger.info("Loaded %s — %d chars", path.name, len(doc.page_content))
+    return [doc]
 
 
 def split_documents(
     documents: Iterable[Document],
-    chunk_size: int | None = None,
-    chunk_overlap: int | None = None,
+    chunk_size: int = DEFAULT_CHUNK_SIZE,
+    chunk_overlap: int = DEFAULT_CHUNK_OVERLAP,
 ) -> list[Document]:
-    """
-    Split documents into chunks small enough for embedding and retrieval.
-
-    The chunk settings default to values from backend/app/config.py, so later
-    changes can be made in one place.
-    """
+    """Split documents into overlapping chunks for embedding and retrieval."""
     splitter = RecursiveCharacterTextSplitter(
-        chunk_size=chunk_size if chunk_size is not None else settings.chunk_size,
-        chunk_overlap=chunk_overlap if chunk_overlap is not None else settings.chunk_overlap,
+        chunk_size=chunk_size,
+        chunk_overlap=chunk_overlap,
         add_start_index=True,
     )
 
@@ -69,24 +67,34 @@ def split_documents(
     for chunk_index, chunk in enumerate(chunks):
         chunk.metadata["chunk_index"] = chunk_index
 
+    logger.info(
+        "Split into %d chunks (chunk_size=%d, overlap=%d)",
+        len(chunks),
+        chunk_size,
+        chunk_overlap,
+    )
     return chunks
 
 
-def ingest_file(file_path: str | Path) -> list[Document]:
+def ingest_path(
+    file_path: str | Path,
+    chunk_size: int = DEFAULT_CHUNK_SIZE,
+    chunk_overlap: int = DEFAULT_CHUNK_OVERLAP,
+) -> list[Document]:
     """Load one file and return its text chunks."""
-    ensure_data_directories()
-    return split_documents(load_document(file_path))
+    return split_documents(load_document(file_path), chunk_size, chunk_overlap)
 
 
-def ingest_files(file_paths: Iterable[str | Path]) -> list[Document]:
+def ingest_paths(
+    file_paths: Iterable[str | Path],
+    chunk_size: int = DEFAULT_CHUNK_SIZE,
+    chunk_overlap: int = DEFAULT_CHUNK_OVERLAP,
+) -> list[Document]:
     """Load many files and return one combined list of chunks."""
-    ensure_data_directories()
-
     documents: list[Document] = []
     for file_path in file_paths:
         documents.extend(load_document(file_path))
-
-    return split_documents(documents)
+    return split_documents(documents, chunk_size, chunk_overlap)
 
 
 def _load_text(path: Path) -> Document:
@@ -100,6 +108,8 @@ def _load_pdf(path: Path) -> list[Document]:
 
     for page_number, page in enumerate(reader.pages, start=1):
         text = page.extract_text() or ""
+        if not text.strip():
+            continue
         metadata = _base_metadata(path)
         metadata["page"] = page_number
         documents.append(Document(page_content=text, metadata=metadata))
